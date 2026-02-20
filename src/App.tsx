@@ -95,10 +95,17 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   </AnimatePresence>
 );
 
-const TaskView = () => {
+const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boolean, onModalClose?: () => void }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', due_date: '', priority: 'Medium' });
+
+  useEffect(() => {
+    if (openModalOnMount) {
+      setIsModalOpen(true);
+      onModalClose?.();
+    }
+  }, [openModalOnMount]);
 
   const fetchTasks = () => fetch('/api/tasks').then(res => res.json()).then(setTasks);
   useEffect(() => { fetchTasks(); }, []);
@@ -258,6 +265,65 @@ const AnalyticsView = () => {
   );
 };
 
+const SettingsView = () => {
+  return (
+    <div className="space-y-8 max-w-4xl">
+      <h3 className="text-xl font-bold text-slate-900">Settings</h3>
+      
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
+        <div className="p-6">
+          <h4 className="text-sm font-bold text-slate-900 mb-4">Profile Settings</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Full Name</label>
+              <input className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" defaultValue="Rajesh Kumar" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Email Address</label>
+              <input className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" defaultValue="rajesh@corecrm.in" />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <h4 className="text-sm font-bold text-slate-900 mb-4">Localization</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Currency</label>
+              <select className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm">
+                <option>Indian Rupee (₹)</option>
+                <option>US Dollar ($)</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Timezone</label>
+              <select className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm">
+                <option>(GMT+05:30) India Standard Time</option>
+                <option>(GMT-08:00) Pacific Time</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-bold text-slate-900">AI Insights</h4>
+            <p className="text-xs text-slate-500">Enable Gemini-powered lead analysis</p>
+          </div>
+          <div className="w-12 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
+            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3">
+        <button className="px-6 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all">Cancel</button>
+        <button className="px-6 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all">Save Changes</button>
+      </div>
+    </div>
+  );
+};
+
 const DashboardView = ({ stats }: { stats: Stats | null }) => {
   const data = [
     { name: 'Jan', value: 4000 },
@@ -356,7 +422,7 @@ const DashboardView = ({ stats }: { stats: Stats | null }) => {
   );
 };
 
-const ContactsView = () => {
+const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQuery: string, openModalOnMount?: boolean, onModalClose?: () => void }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -364,12 +430,25 @@ const ContactsView = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', email: '', company: '', status: 'Lead', value: 0 });
 
+  useEffect(() => {
+    if (openModalOnMount) {
+      setIsModalOpen(true);
+      onModalClose?.();
+    }
+  }, [openModalOnMount]);
+
   const fetchContacts = () => fetch('/api/contacts').then(res => res.json()).then(data => {
     setContacts(data);
     setLoading(false);
   });
 
   useEffect(() => { fetchContacts(); }, []);
+
+  const filteredContacts = contacts.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleAddContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -413,7 +492,7 @@ const ContactsView = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {contacts.map((contact) => (
+              {filteredContacts.map((contact) => (
                 <tr 
                   key={contact.id} 
                   onClick={() => handleContactClick(contact)}
@@ -548,12 +627,19 @@ const ContactsView = () => {
   );
 };
 
-const PipelineView = () => {
+const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQuery: string, openModalOnMount?: boolean, onModalClose?: () => void }) => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newDeal, setNewDeal] = useState({ title: '', contact_id: 0, stage: 'Discovery', value: 0, close_date: '' });
   const stages = ['Discovery', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won'];
+
+  useEffect(() => {
+    if (openModalOnMount) {
+      setIsModalOpen(true);
+      onModalClose?.();
+    }
+  }, [openModalOnMount]);
 
   const fetchData = () => {
     fetch('/api/deals').then(res => res.json()).then(setDeals);
@@ -561,6 +647,11 @@ const PipelineView = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const filteredDeals = deals.filter(d => 
+    d.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    d.contact_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleAddDeal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -600,11 +691,11 @@ const PipelineView = () => {
             <div className="flex items-center justify-between px-2 bg-slate-100/50 py-2 rounded-lg">
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stage}</h4>
               <span className="text-[10px] font-bold text-slate-400">
-                {deals.filter(d => d.stage === stage).length}
+                {filteredDeals.filter(d => d.stage === stage).length}
               </span>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto">
-              {deals.filter(d => d.stage === stage).map(deal => (
+              {filteredDeals.filter(d => d.stage === stage).map(deal => (
                 <motion.div 
                   layoutId={`deal-${deal.id}`}
                   key={deal.id} 
@@ -669,6 +760,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState<Stats | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pendingModal, setPendingModal] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/stats')
@@ -698,7 +791,12 @@ export default function App() {
         </div>
 
         <div className="mt-auto p-6 border-t border-slate-100">
-          <SidebarItem icon={Settings} label="Settings" onClick={() => {}} />
+          <SidebarItem 
+            icon={Settings} 
+            label="Settings" 
+            active={activeTab === 'settings'} 
+            onClick={() => setActiveTab('settings')} 
+          />
           <div className="mt-6 flex items-center gap-3 px-2">
             <div className="w-8 h-8 rounded-full bg-slate-200" />
             <div className="flex-1 min-w-0">
@@ -719,6 +817,8 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="Search anything..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
               />
             </div>
@@ -750,10 +850,11 @@ export default function App() {
               className="h-full"
             >
               {activeTab === 'dashboard' && <DashboardView stats={stats} />}
-              {activeTab === 'contacts' && <ContactsView />}
-              {activeTab === 'pipeline' && <PipelineView />}
-              {activeTab === 'tasks' && <TaskView />}
+              {activeTab === 'contacts' && <ContactsView searchQuery={searchQuery} openModalOnMount={pendingModal === 'contact'} onModalClose={() => setPendingModal(null)} />}
+              {activeTab === 'pipeline' && <PipelineView searchQuery={searchQuery} openModalOnMount={pendingModal === 'deal'} onModalClose={() => setPendingModal(null)} />}
+              {activeTab === 'tasks' && <TaskView openModalOnMount={pendingModal === 'task'} onModalClose={() => setPendingModal(null)} />}
               {activeTab === 'analytics' && <AnalyticsView />}
+              {activeTab === 'settings' && <SettingsView />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -762,7 +863,7 @@ export default function App() {
       <Modal isOpen={isQuickAddOpen} onClose={() => setIsQuickAddOpen(false)} title="Quick Actions">
         <div className="grid grid-cols-1 gap-3">
           <button 
-            onClick={() => { setActiveTab('contacts'); setIsQuickAddOpen(false); }}
+            onClick={() => { setActiveTab('contacts'); setPendingModal('contact'); setIsQuickAddOpen(false); }}
             className="flex items-center gap-3 p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all text-left"
           >
             <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><UserPlus className="w-5 h-5" /></div>
@@ -772,7 +873,7 @@ export default function App() {
             </div>
           </button>
           <button 
-            onClick={() => { setActiveTab('pipeline'); setIsQuickAddOpen(false); }}
+            onClick={() => { setActiveTab('pipeline'); setPendingModal('deal'); setIsQuickAddOpen(false); }}
             className="flex items-center gap-3 p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all text-left"
           >
             <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><Target className="w-5 h-5" /></div>
@@ -782,7 +883,7 @@ export default function App() {
             </div>
           </button>
           <button 
-            onClick={() => { setActiveTab('tasks'); setIsQuickAddOpen(false); }}
+            onClick={() => { setActiveTab('tasks'); setPendingModal('task'); setIsQuickAddOpen(false); }}
             className="flex items-center gap-3 p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all text-left"
           >
             <div className="p-2 bg-violet-100 rounded-lg text-violet-600"><CheckSquare className="w-5 h-5" /></div>
