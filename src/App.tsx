@@ -46,39 +46,80 @@ import { format, differenceInDays, parseISO } from 'date-fns';
 
 // --- Components ---
 
-const SidebarItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active?: boolean, onClick: () => void }) => (
-  <button 
-    onClick={onClick}
-    className={cn(
-      "flex items-center w-full gap-3 px-4 py-3 text-sm font-medium transition-all rounded-lg group",
-      active 
-        ? "bg-emerald-50 text-emerald-700" 
-        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-    )}
-  >
-    <Icon className={cn("w-5 h-5", active ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-600")} />
-    {label}
-  </button>
-);
+const SidebarItem = ({ icon: Icon, label, active, onClick, primaryColor = 'emerald', theme = 'light' }: { icon: any, label: string, active?: boolean, onClick: () => void, primaryColor?: string, theme?: string }) => {
+  const activeColors = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    blue: "bg-blue-50 text-blue-700",
+    violet: "bg-violet-50 text-violet-700",
+    rose: "bg-rose-50 text-rose-700"
+  };
 
-const StatCard = ({ label, value, icon: Icon, trend, color }: { label: string, value: string | number, icon: any, trend?: string, color: string }) => (
-  <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+  const activeDarkColors = {
+    emerald: "bg-emerald-500/10 text-emerald-400",
+    blue: "bg-blue-500/10 text-blue-400",
+    violet: "bg-violet-500/10 text-violet-400",
+    rose: "bg-rose-500/10 text-rose-400"
+  };
+
+  const iconColors = {
+    emerald: "text-emerald-600",
+    blue: "text-blue-600",
+    violet: "text-violet-600",
+    rose: "text-rose-600"
+  };
+
+  const iconDarkColors = {
+    emerald: "text-emerald-400",
+    blue: "text-blue-400",
+    violet: "text-violet-400",
+    rose: "text-rose-400"
+  };
+
+  return (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "flex items-center w-full gap-3 px-4 py-3 text-sm font-medium transition-all rounded-lg group",
+        active 
+          ? (theme === 'dark' ? activeDarkColors[primaryColor as keyof typeof activeDarkColors] : activeColors[primaryColor as keyof typeof activeColors])
+          : (theme === 'dark' ? "text-slate-400 hover:bg-slate-800 hover:text-slate-200" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900")
+      )}
+    >
+      <Icon className={cn(
+        "w-5 h-5", 
+        active 
+          ? (theme === 'dark' ? iconDarkColors[primaryColor as keyof typeof iconDarkColors] : iconColors[primaryColor as keyof typeof iconColors])
+          : "text-slate-400 group-hover:text-slate-600"
+      )} />
+      {label}
+    </button>
+  );
+};
+
+const StatCard = ({ label, value, icon: Icon, trend, color, theme = 'light' }: { label: string, value: string | number, icon: any, trend?: string, color: string, theme?: string }) => (
+  <div className={cn(
+    "p-6 border rounded-2xl shadow-sm transition-colors",
+    theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+  )}>
     <div className="flex items-center justify-between mb-4">
       <div className={cn("p-2 rounded-lg", color)}>
         <Icon className="w-5 h-5 text-white" />
       </div>
       {trend && (
-        <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+        <span className={cn(
+          "text-xs font-medium px-2 py-1 rounded-full",
+          theme === 'dark' ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-600 bg-emerald-50"
+        )}>
           {trend}
         </span>
       )}
     </div>
-    <div className="text-2xl font-bold text-slate-900">{value}</div>
+    <div className={cn("text-2xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{value}</div>
     <div className="text-sm text-slate-500">{label}</div>
   </div>
 );
 
-const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => (
+const Modal = ({ isOpen, onClose, title, children, theme = 'light' }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode, theme?: string }) => (
   <AnimatePresence>
     {isOpen && (
       <div 
@@ -89,11 +130,14 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+          className={cn(
+            "rounded-2xl shadow-xl w-full max-w-md overflow-hidden",
+            theme === 'dark' ? "bg-slate-900 border border-slate-800" : "bg-white"
+          )}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-900">{title}</h3>
+          <div className={cn("px-6 py-4 border-b flex items-center justify-between", theme === 'dark' ? "border-slate-800" : "border-slate-100")}>
+            <h3 className={cn("font-semibold", theme === 'dark' ? "text-white" : "text-slate-900")}>{title}</h3>
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
               <Plus className="w-5 h-5 rotate-45" />
             </button>
@@ -107,10 +151,13 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
   </AnimatePresence>
 );
 
-const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boolean, onModalClose?: () => void }) => {
+const TaskView = ({ openModalOnMount, onModalClose, settings }: { openModalOnMount?: boolean, onModalClose?: () => void, settings: UserSettings }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', due_date: '', priority: 'Medium' });
+
+  const theme = settings.theme;
+  const compact = settings.compactMode;
 
   useEffect(() => {
     if (openModalOnMount) {
@@ -193,21 +240,32 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="divide-y divide-slate-100">
+      <div className={cn(
+        "border rounded-2xl shadow-sm overflow-hidden transition-colors",
+        theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+      )}>
+        <div className={cn("divide-y", theme === 'dark' ? "divide-slate-800" : "divide-slate-100")}>
           {tasks.map(task => (
-            <div key={task.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+            <div key={task.id} className={cn(
+              "flex items-center gap-4 transition-colors",
+              compact ? "p-2" : "p-4",
+              theme === 'dark' ? "hover:bg-slate-800" : "hover:bg-slate-50"
+            )}>
               <button 
                 onClick={() => toggleTaskStatus(task)}
                 className={cn(
                   "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                  task.status === 'Completed' ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-200"
+                  task.status === 'Completed' ? "bg-emerald-500 border-emerald-500 text-white" : (theme === 'dark' ? "border-slate-700" : "border-slate-200")
                 )}
               >
                 {task.status === 'Completed' && <CheckSquare className="w-4 h-4" />}
               </button>
               <div className="flex-1">
-                <div className={cn("text-sm font-medium flex items-center gap-2", task.status === 'Completed' ? "text-slate-400 line-through" : "text-slate-900")}>
+                <div className={cn(
+                  "font-medium flex items-center gap-2", 
+                  compact ? "text-xs" : "text-sm",
+                  task.status === 'Completed' ? "text-slate-500 line-through" : (theme === 'dark' ? "text-slate-200" : "text-slate-900")
+                )}>
                   <div className={cn(
                     "w-2 h-2 rounded-full shrink-0",
                     task.priority === 'High' ? "bg-rose-500" :
@@ -216,7 +274,7 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
                   )} />
                   {task.title}
                 </div>
-                <div className="text-xs text-slate-500">Due: {task.due_date}</div>
+                <div className="text-[10px] text-slate-500">Due: {task.due_date}</div>
               </div>
               <span className={cn(
                 "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
@@ -231,13 +289,16 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Task">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Task" theme={theme}>
         <form onSubmit={handleAddTask} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Task Title</label>
             <input 
               required
-              className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm"
+              className={cn(
+                "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+              )}
               value={newTask.title}
               onChange={e => setNewTask({...newTask, title: e.target.value})}
             />
@@ -248,7 +309,10 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
               <input 
                 type="date"
                 required
-                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm"
+                className={cn(
+                  "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                  theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                )}
                 value={newTask.due_date}
                 onChange={e => setNewTask({...newTask, due_date: e.target.value})}
               />
@@ -256,7 +320,10 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Priority</label>
               <select 
-                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm"
+                className={cn(
+                  "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                  theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                )}
                 value={newTask.priority}
                 onChange={e => setNewTask({...newTask, priority: e.target.value})}
               >
@@ -266,7 +333,12 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
               </select>
             </div>
           </div>
-          <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold mt-4">Create Task</button>
+          <button type="submit" className={cn(
+            "w-full py-3 text-white rounded-xl font-semibold mt-4",
+            settings.primaryColor === 'emerald' ? "bg-emerald-600" :
+            settings.primaryColor === 'blue' ? "bg-blue-600" :
+            settings.primaryColor === 'violet' ? "bg-violet-600" : "bg-rose-600"
+          )}>Create Task</button>
         </form>
       </Modal>
     </div>
@@ -278,6 +350,7 @@ const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
   const [loading, setLoading] = useState(true);
   const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
   const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
+  const theme = settings.theme;
 
   useEffect(() => {
     fetch('/api/deals')
@@ -305,17 +378,22 @@ const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
 
   return (
     <div className="space-y-8">
-      <h3 className="text-xl font-bold text-slate-900">Analytics</h3>
+      <h3 className={cn("text-xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>Analytics</h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <div className={cn(
+          "p-6 border rounded-2xl shadow-sm transition-colors",
+          theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+        )}>
           <h4 className="text-sm font-bold text-slate-500 uppercase mb-6">Win vs Loss Ratio</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? "#1e293b" : "#f1f5f9"} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                <Tooltip />
+                <Tooltip 
+                  contentStyle={theme === 'dark' ? { backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' } : { borderRadius: '12px', border: 'none' }}
+                />
                 <Bar dataKey="won" fill="#10b981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="lost" fill="#f43f5e" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -323,7 +401,10 @@ const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
           </div>
         </div>
 
-        <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <div className={cn(
+          "p-6 border rounded-2xl shadow-sm transition-colors",
+          theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+        )}>
           <h4 className="text-sm font-bold text-slate-500 uppercase mb-6">Pipeline Value by Stage</h4>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -342,6 +423,7 @@ const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
                   ))}
                 </Pie>
                 <Tooltip 
+                  contentStyle={theme === 'dark' ? { backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' } : { borderRadius: '12px', border: 'none' }}
                   formatter={(value: number) => `${currencySymbol}${value.toLocaleString(locale)}`}
                 />
                 <Legend verticalAlign="bottom" height={36}/>
@@ -350,7 +432,10 @@ const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
           </div>
         </div>
 
-        <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm lg:col-span-2">
+        <div className={cn(
+          "p-6 border rounded-2xl shadow-sm lg:col-span-2 transition-colors",
+          theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+        )}>
           <h4 className="text-sm font-bold text-slate-500 uppercase mb-6">Stage Distribution (Count)</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {stages.slice(0, 4).map(stage => {
@@ -361,10 +446,15 @@ const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
                 <div key={stage} className="space-y-1">
                   <div className="flex justify-between text-xs font-medium">
                     <span className="text-slate-600">{stage}</span>
-                    <span className="text-slate-900">{percentage}%</span>
+                    <span className={theme === 'dark' ? "text-slate-200" : "text-slate-900"}>{percentage}%</span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${percentage}%` }} />
+                  <div className={cn("w-full h-2 rounded-full overflow-hidden", theme === 'dark' ? "bg-slate-800" : "bg-slate-100")}>
+                    <div className={cn(
+                      "h-full rounded-full",
+                      settings.primaryColor === 'emerald' ? "bg-emerald-500" :
+                      settings.primaryColor === 'blue' ? "bg-blue-500" :
+                      settings.primaryColor === 'violet' ? "bg-violet-500" : "bg-rose-500"
+                    )} style={{ width: `${percentage}%` }} />
                   </div>
                 </div>
               );
@@ -414,78 +504,157 @@ const SettingsView = ({ settings, onSave }: { settings: UserSettings, onSave: (n
         )}
       </AnimatePresence>
 
-      <h3 className="text-xl font-bold text-slate-900">Settings</h3>
+      <h3 className={cn("text-xl font-bold", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Settings</h3>
       
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
-        <div className="p-6">
-          <h4 className="text-sm font-bold text-slate-900 mb-4">Profile Settings</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Full Name</label>
-              <input 
-                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all" 
-                value={localSettings.fullName}
-                onChange={e => setLocalSettings({...localSettings, fullName: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Email Address</label>
-              <input 
-                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all" 
-                value={localSettings.email}
-                onChange={e => setLocalSettings({...localSettings, email: e.target.value})}
-              />
+        <div className={cn(
+          "border rounded-2xl shadow-sm divide-y transition-colors",
+          settings.theme === 'dark' ? "bg-slate-900 border-slate-800 divide-slate-800" : "bg-white border-slate-200 divide-slate-100"
+        )}>
+          <div className="p-6">
+            <h4 className={cn("text-sm font-bold mb-4", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Profile Settings</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Full Name</label>
+                <input 
+                  className={cn(
+                    "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                    settings.theme === 'dark' ? "bg-slate-800 text-white focus:ring-emerald-500/40" : "bg-slate-50 text-slate-900 focus:ring-emerald-500/20"
+                  )}
+                  value={localSettings.fullName}
+                  onChange={e => setLocalSettings({...localSettings, fullName: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Email Address</label>
+                <input 
+                  className={cn(
+                    "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                    settings.theme === 'dark' ? "bg-slate-800 text-white focus:ring-emerald-500/40" : "bg-slate-50 text-slate-900 focus:ring-emerald-500/20"
+                  )}
+                  value={localSettings.email}
+                  onChange={e => setLocalSettings({...localSettings, email: e.target.value})}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="p-6">
-          <h4 className="text-sm font-bold text-slate-900 mb-4">Localization</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Currency</label>
-              <select 
-                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                value={localSettings.currency}
-                onChange={e => setLocalSettings({...localSettings, currency: e.target.value as any})}
-              >
-                <option>Indian Rupee (₹)</option>
-                <option>US Dollar ($)</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Timezone</label>
-              <select 
-                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                value={localSettings.timezone}
-                onChange={e => setLocalSettings({...localSettings, timezone: e.target.value})}
-              >
-                <option>(GMT+05:30) India Standard Time</option>
-                <option>(GMT-08:00) Pacific Time</option>
-              </select>
+          <div className="p-6">
+            <h4 className={cn("text-sm font-bold mb-4", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Localization</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Currency</label>
+                <select 
+                  className={cn(
+                    "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                    settings.theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                  )}
+                  value={localSettings.currency}
+                  onChange={e => setLocalSettings({...localSettings, currency: e.target.value as any})}
+                >
+                  <option>Indian Rupee (₹)</option>
+                  <option>US Dollar ($)</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Timezone</label>
+                <select 
+                  className={cn(
+                    "w-full px-4 py-2 border-none rounded-xl text-sm transition-all",
+                    settings.theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                  )}
+                  value={localSettings.timezone}
+                  onChange={e => setLocalSettings({...localSettings, timezone: e.target.value})}
+                >
+                  <option>(GMT+05:30) India Standard Time</option>
+                  <option>(GMT-08:00) Pacific Time</option>
+                </select>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="p-6 flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-bold text-slate-900">AI Insights</h4>
-            <p className="text-xs text-slate-500">Enable Gemini-powered lead analysis</p>
+          <div className="p-6">
+            <h4 className={cn("text-sm font-bold mb-4", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Appearance</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Theme</label>
+                <div className="flex gap-2">
+                  {['light', 'dark'].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setLocalSettings({...localSettings, theme: t as any})}
+                      className={cn(
+                        "flex-1 py-2 rounded-xl text-xs font-bold uppercase transition-all border",
+                        localSettings.theme === t 
+                          ? "bg-emerald-600 border-emerald-600 text-white" 
+                          : (settings.theme === 'dark' ? "bg-slate-800 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-600")
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Primary Color</label>
+                <div className="flex gap-2">
+                  {(['emerald', 'blue', 'violet', 'rose'] as const).map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setLocalSettings({...localSettings, primaryColor: c})}
+                      className={cn(
+                        "w-8 h-8 rounded-full transition-all border-2",
+                        c === 'emerald' ? "bg-emerald-500" : c === 'blue' ? "bg-blue-500" : c === 'violet' ? "bg-violet-500" : "bg-rose-500",
+                        localSettings.primaryColor === c 
+                          ? (settings.theme === 'dark' ? "border-slate-400 scale-110 shadow-lg" : "border-white scale-110 shadow-lg") 
+                          : "border-transparent opacity-60 hover:opacity-100"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-          <button 
-            onClick={() => setLocalSettings({...localSettings, aiInsights: !localSettings.aiInsights})}
-            className={cn(
-              "w-12 h-6 rounded-full relative transition-all duration-200",
-              localSettings.aiInsights ? "bg-emerald-500" : "bg-slate-200"
-            )}
-          >
-            <motion.div 
-              animate={{ x: localSettings.aiInsights ? 24 : 4 }}
-              className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
-            />
-          </button>
+
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className={cn("text-sm font-bold", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Compact Mode</h4>
+                <p className="text-xs text-slate-500">Reduce padding and font sizes across the app</p>
+              </div>
+              <button 
+                onClick={() => setLocalSettings({...localSettings, compactMode: !localSettings.compactMode})}
+                className={cn(
+                  "w-12 h-6 rounded-full relative transition-all duration-200",
+                  localSettings.compactMode ? "bg-emerald-500" : "bg-slate-200"
+                )}
+              >
+                <motion.div 
+                  animate={{ x: localSettings.compactMode ? 24 : 4 }}
+                  className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className={cn("text-sm font-bold", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>AI Insights</h4>
+                <p className="text-xs text-slate-500">Enable Gemini-powered lead analysis</p>
+              </div>
+              <button 
+                onClick={() => setLocalSettings({...localSettings, aiInsights: !localSettings.aiInsights})}
+                className={cn(
+                  "w-12 h-6 rounded-full relative transition-all duration-200",
+                  localSettings.aiInsights ? "bg-emerald-500" : "bg-slate-200"
+                )}
+              >
+                <motion.div 
+                  animate={{ x: localSettings.aiInsights ? 24 : 4 }}
+                  className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+                />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
       <div className="flex justify-end gap-3">
         <button 
@@ -517,6 +686,7 @@ const SettingsView = ({ settings, onSave }: { settings: UserSettings, onSave: (n
 const DashboardView = ({ stats, settings }: { stats: Stats | null, settings: UserSettings }) => {
   const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
   const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
+  const theme = settings.theme;
 
   const data = [
     { name: 'Jan', value: 4000 },
@@ -535,7 +705,8 @@ const DashboardView = ({ stats, settings }: { stats: Stats | null, settings: Use
           value={`${currencySymbol}${(stats?.pipelineValue || 0).toLocaleString(locale)}`} 
           icon={DollarSign} 
           trend="+12.5%" 
-          color="bg-emerald-500"
+          color={settings.primaryColor === 'emerald' ? "bg-emerald-500" : settings.primaryColor === 'blue' ? "bg-blue-500" : settings.primaryColor === 'violet' ? "bg-violet-500" : "bg-rose-500"}
+          theme={theme}
         />
         <StatCard 
           label="Active Deals" 
@@ -543,6 +714,7 @@ const DashboardView = ({ stats, settings }: { stats: Stats | null, settings: Use
           icon={Target} 
           trend="+3" 
           color="bg-blue-500"
+          theme={theme}
         />
         <StatCard 
           label="New Leads" 
@@ -550,20 +722,28 @@ const DashboardView = ({ stats, settings }: { stats: Stats | null, settings: Use
           icon={UserPlus} 
           trend="+8%" 
           color="bg-violet-500"
+          theme={theme}
         />
         <StatCard 
           label="Win Rate" 
           value={`${stats?.winRate}%`} 
           icon={TrendingUp} 
           color="bg-amber-500"
+          theme={theme}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm lg:col-span-2">
+        <div className={cn(
+          "p-6 border rounded-2xl shadow-sm lg:col-span-2 transition-colors",
+          theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+        )}>
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-slate-900">Revenue Forecast</h3>
-            <select className="text-sm border-none bg-slate-50 rounded-lg px-3 py-1 text-slate-600 focus:ring-0">
+            <h3 className={cn("text-lg font-semibold", theme === 'dark' ? "text-white" : "text-slate-900")}>Revenue Forecast</h3>
+            <select className={cn(
+              "text-sm border-none rounded-lg px-3 py-1 focus:ring-0",
+              theme === 'dark' ? "bg-slate-800 text-slate-400" : "bg-slate-50 text-slate-600"
+            )}>
               <option>Last 6 Months</option>
               <option>Last Year</option>
             </select>
@@ -573,38 +753,53 @@ const DashboardView = ({ stats, settings }: { stats: Stats | null, settings: Use
               <AreaChart data={data}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor={settings.primaryColor === 'emerald' ? "#10b981" : settings.primaryColor === 'blue' ? "#3b82f6" : settings.primaryColor === 'violet' ? "#8b5cf6" : "#f43f5e"} stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor={settings.primaryColor === 'emerald' ? "#10b981" : settings.primaryColor === 'blue' ? "#3b82f6" : settings.primaryColor === 'violet' ? "#8b5cf6" : "#f43f5e"} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? "#1e293b" : "#f1f5f9"} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={theme === 'dark' ? { backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' } : { borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+                <Area type="monotone" dataKey="value" stroke={settings.primaryColor === 'emerald' ? "#10b981" : settings.primaryColor === 'blue' ? "#3b82f6" : settings.primaryColor === 'violet' ? "#8b5cf6" : "#f43f5e"} strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <div className={cn(
+          "p-6 border rounded-2xl shadow-sm transition-colors",
+          theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+        )}>
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-slate-900">AI Insights</h3>
-            <Sparkles className="w-5 h-5 text-emerald-500" />
+            <h3 className={cn("text-lg font-semibold", theme === 'dark' ? "text-white" : "text-slate-900")}>AI Insights</h3>
+            <Sparkles className={cn(
+              "w-5 h-5",
+              settings.primaryColor === 'emerald' ? "text-emerald-500" : settings.primaryColor === 'blue' ? "text-blue-500" : settings.primaryColor === 'violet' ? "text-violet-500" : "text-rose-500"
+            )} />
           </div>
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-              <p className="text-sm text-emerald-900 leading-relaxed">
+            <div className={cn(
+              "p-4 rounded-xl border transition-colors",
+              theme === 'dark' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-100" : "bg-emerald-50 border-emerald-100 text-emerald-900"
+            )}>
+              <p className="text-sm leading-relaxed">
                 <span className="font-bold">Reliance Industries</span> deal is showing high intent. Their team visited the pricing page 4 times today.
               </p>
-              <button className="mt-3 text-xs font-semibold text-emerald-700 flex items-center gap-1">
+              <button className={cn(
+                "mt-3 text-xs font-semibold flex items-center gap-1",
+                theme === 'dark' ? "text-emerald-400" : "text-emerald-700"
+              )}>
                 Draft Follow-up <ChevronRight className="w-3 h-3" />
               </button>
             </div>
-            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-              <p className="text-sm text-blue-900 leading-relaxed">
+            <div className={cn(
+              "p-4 rounded-xl border transition-colors",
+              theme === 'dark' ? "bg-blue-500/10 border-blue-500/20 text-blue-100" : "bg-blue-50 border-blue-100 text-blue-900"
+            )}>
+              <p className="text-sm leading-relaxed">
                 Pipeline health is <span className="font-bold">excellent</span>. You're on track to exceed Q1 targets by 15%.
               </p>
             </div>
@@ -625,6 +820,8 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
 
   const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
   const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
+  const theme = settings.theme;
+  const compact = settings.compactMode;
 
   useEffect(() => {
     if (openModalOnMount) {
@@ -688,10 +885,14 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
 
   return (
     <div className="flex gap-6 h-full">
-      <div className={cn("bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex-1 transition-all", selectedContact ? "w-2/3" : "w-full")}>
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+      <div className={cn(
+        "border rounded-2xl shadow-sm overflow-hidden flex-1 transition-all", 
+        selectedContact ? "w-2/3" : "w-full",
+        theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+      )}>
+        <div className={cn("p-4 border-b flex items-center justify-between", theme === 'dark' ? "border-slate-800" : "border-slate-100")}>
           <div className="flex items-center gap-4">
-            <h3 className="font-semibold text-slate-900">Contacts</h3>
+            <h3 className={cn("font-semibold", theme === 'dark' ? "text-white" : "text-slate-900")}>Contacts</h3>
             <div className="flex items-center gap-1">
               <button 
                 onClick={handleExportExcel}
@@ -711,7 +912,10 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="p-2 hover:bg-slate-50 rounded-lg text-emerald-600"
+            className={cn(
+              "p-2 hover:bg-slate-50 rounded-lg",
+              settings.primaryColor === 'emerald' ? "text-emerald-600" : settings.primaryColor === 'blue' ? "text-blue-600" : settings.primaryColor === 'violet' ? "text-violet-600" : "text-rose-600"
+            )}
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -719,7 +923,7 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50">
+              <tr className={theme === 'dark' ? "bg-slate-800/50" : "bg-slate-50/50"}>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Company</th>
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
@@ -727,20 +931,26 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
                 <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className={cn("divide-y", theme === 'dark' ? "divide-slate-800" : "divide-slate-100")}>
               {filteredContacts.map((contact) => (
                 <tr 
                   key={contact.id} 
                   onClick={() => handleContactClick(contact)}
-                  className="hover:bg-slate-50 cursor-pointer transition-colors group"
+                  className={cn(
+                    "cursor-pointer transition-colors group",
+                    theme === 'dark' ? "hover:bg-slate-800" : "hover:bg-slate-50"
+                  )}
                 >
-                  <td className="px-6 py-4">
+                  <td className={cn("px-6", compact ? "py-2" : "py-4")}>
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-medium text-xs">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center font-medium text-xs",
+                        theme === 'dark' ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
+                      )}>
                         {contact.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-slate-900">{contact.name}</div>
+                        <div className={cn("text-sm font-medium", theme === 'dark' ? "text-slate-200" : "text-slate-900")}>{contact.name}</div>
                         <div className="text-xs text-slate-500">{contact.email}</div>
                       </div>
                     </div>
@@ -756,7 +966,7 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
                       {contact.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{currencySymbol}{(contact.value || 0).toLocaleString(locale)}</td>
+                  <td className={cn("px-6 py-4 text-sm font-medium", theme === 'dark' ? "text-slate-200" : "text-slate-900")}>{currencySymbol}{(contact.value || 0).toLocaleString(locale)}</td>
                   <td className="px-6 py-4 text-right">
                     <button className="p-1 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
                       <MoreVertical className="w-4 h-4" />
@@ -769,24 +979,24 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
         </div>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Contact">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Contact" theme={theme}>
         <form onSubmit={handleAddContact} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Full Name</label>
-            <input required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
+            <input required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email</label>
-            <input type="email" required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
+            <input type="email" required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Company</label>
-            <input required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newContact.company} onChange={e => setNewContact({...newContact, company: e.target.value})} />
+            <input required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newContact.company} onChange={e => setNewContact({...newContact, company: e.target.value})} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
-              <select className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newContact.status} onChange={e => setNewContact({...newContact, status: e.target.value as any})}>
+              <select className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newContact.status} onChange={e => setNewContact({...newContact, status: e.target.value as any})}>
                 <option>Lead</option>
                 <option>Opportunity</option>
                 <option>Customer</option>
@@ -794,10 +1004,13 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Value ({currencySymbol})</label>
-              <input type="number" className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newContact.value} onChange={e => setNewContact({...newContact, value: Number(e.target.value)})} />
+              <input type="number" className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newContact.value} onChange={e => setNewContact({...newContact, value: Number(e.target.value)})} />
             </div>
           </div>
-          <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold mt-4">Create Contact</button>
+          <button type="submit" className={cn(
+            "w-full py-3 text-white rounded-xl font-semibold mt-4",
+            settings.primaryColor === 'emerald' ? "bg-emerald-600" : settings.primaryColor === 'blue' ? "bg-blue-600" : settings.primaryColor === 'violet' ? "bg-violet-600" : "bg-rose-600"
+          )}>Create Contact</button>
         </form>
       </Modal>
 
@@ -807,37 +1020,49 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
             initial={{ x: 300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 300, opacity: 0 }}
-            className="w-1/3 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6 overflow-y-auto"
+            className={cn(
+              "w-1/3 border rounded-2xl shadow-sm p-6 space-y-6 transition-colors overflow-y-auto",
+              theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+            )}
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Contact Details</h3>
+              <h3 className={cn("font-semibold", theme === 'dark' ? "text-white" : "text-slate-900")}>Contact Details</h3>
               <button onClick={() => setSelectedContact(null)} className="text-slate-400 hover:text-slate-600">
                 <Plus className="w-5 h-5 rotate-45" />
               </button>
             </div>
 
             <div className="text-center space-y-2">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-2xl mx-auto">
+              <div className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl mx-auto",
+                theme === 'dark' ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"
+              )}>
                 {selectedContact.name.split(' ').map(n => n[0]).join('')}
               </div>
-              <h4 className="text-xl font-bold text-slate-900">{selectedContact.name}</h4>
+              <h4 className={cn("text-xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>{selectedContact.name}</h4>
               <p className="text-sm text-slate-500">{selectedContact.company}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <a href={`mailto:${selectedContact.email}`} className="flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium">
+              <a href={`mailto:${selectedContact.email}`} className={cn(
+                "flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-colors",
+                theme === 'dark' ? "border-slate-800 text-slate-300 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              )}>
                 <Mail className="w-4 h-4" /> Email
               </a>
-              <button className="flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium">
+              <button className={cn(
+                "flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-colors",
+                theme === 'dark' ? "border-slate-800 text-slate-300 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              )}>
                 <Phone className="w-4 h-4" /> Call
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 space-y-3">
+            <div className={cn("p-4 rounded-xl space-y-3", theme === 'dark' ? "bg-slate-800" : "bg-slate-50")}>
               <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm">
                 <Sparkles className="w-4 h-4" /> AI Insight
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed italic">
+              <p className={cn("text-sm leading-relaxed italic", theme === 'dark' ? "text-slate-300" : "text-slate-600")}>
                 "{insight}"
               </p>
             </div>
@@ -847,9 +1072,9 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
               <div className="space-y-3">
                 {[1, 2].map(i => (
                   <div key={i} className="flex gap-3">
-                    <div className="w-1 h-full bg-slate-100 rounded-full" />
+                    <div className={cn("w-1 h-full rounded-full", theme === 'dark' ? "bg-slate-800" : "bg-slate-100")} />
                     <div>
-                      <div className="text-sm font-medium text-slate-900">Email sent by Rajesh</div>
+                      <div className={cn("text-sm font-medium", theme === 'dark' ? "text-slate-200" : "text-slate-900")}>Email sent by Rajesh</div>
                       <div className="text-xs text-slate-500">2 days ago</div>
                     </div>
                   </div>
@@ -924,6 +1149,24 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
     exportToExcel(exportData, 'Pipeline_Export');
   };
 
+  const theme = settings.theme;
+  const compact = settings.compactMode;
+
+  const [draggedOverStage, setDraggedOverStage] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, dealId: number) => {
+    e.dataTransfer.setData('dealId', dealId.toString());
+  };
+
+  const handleDrop = (e: React.DragEvent, stage: string) => {
+    e.preventDefault();
+    setDraggedOverStage(null);
+    const dealId = Number(e.dataTransfer.getData('dealId'));
+    if (dealId) {
+      moveDeal(dealId, stage);
+    }
+  };
+
   const handleExportPDF = () => {
     const exportData = filteredDeals.map(d => ({
       title: d.title,
@@ -939,7 +1182,7 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
     <div className="h-full flex flex-col space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="text-xl font-bold text-slate-900">Pipeline</h3>
+          <h3 className={cn("text-xl font-bold", theme === 'dark' ? "text-white" : "text-slate-900")}>Pipeline</h3>
           <div className="flex items-center gap-1">
             <button 
               onClick={handleExportExcel}
@@ -959,34 +1202,59 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold"
+          className={cn(
+            "flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm",
+            settings.primaryColor === 'emerald' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200" :
+            settings.primaryColor === 'blue' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-200" :
+            settings.primaryColor === 'violet' ? "bg-violet-600 hover:bg-violet-700 shadow-violet-200" :
+            "bg-rose-600 hover:bg-rose-700 shadow-rose-200"
+          )}
         >
-          <Plus className="w-4 h-4" /> New Deal
+          <Plus className="w-4 h-4" /> Add Deal
         </button>
       </div>
 
       <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
         {stages.map(stage => (
-          <div key={stage} className="flex-shrink-0 w-72 flex flex-col space-y-4">
-            <div className="flex items-center justify-between px-2 bg-slate-100/50 py-2 rounded-lg">
+          <div 
+            key={stage} 
+            className="flex-shrink-0 w-72 flex flex-col space-y-4"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDraggedOverStage(stage);
+            }}
+            onDragLeave={() => setDraggedOverStage(null)}
+            onDrop={(e) => handleDrop(e, stage)}
+          >
+            <div className={cn(
+              "flex items-center justify-between px-2 py-2 rounded-lg transition-colors", 
+              theme === 'dark' ? "bg-slate-800/50" : "bg-slate-100/50",
+              draggedOverStage === stage && (theme === 'dark' ? "bg-slate-700" : "bg-slate-200")
+            )}>
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stage}</h4>
               <span className="text-[10px] font-bold text-slate-400">
                 {filteredDeals.filter(d => d.stage === stage).length}
               </span>
             </div>
-            <div className="flex-1 space-y-3 overflow-y-auto">
+            <div className={cn(
+              "flex-1 space-y-3 overflow-y-auto rounded-xl transition-colors p-1",
+              draggedOverStage === stage && (theme === 'dark' ? "bg-slate-800/30 ring-2 ring-emerald-500/20" : "bg-slate-50 ring-2 ring-emerald-500/20")
+            )}>
               {filteredDeals.filter(d => d.stage === stage).map(deal => (
                 <motion.div 
                   layout
                   layoutId={`deal-${deal.id}`}
                   key={deal.id} 
+                  draggable
+                  onDragStart={(e: any) => handleDragStart(e, deal.id)}
                   onClick={() => setExpandedDealId(expandedDealId === deal.id ? null : deal.id)}
                   className={cn(
-                    "p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all group cursor-pointer",
-                    expandedDealId === deal.id && "ring-2 ring-emerald-500 border-transparent"
+                    "p-4 border rounded-xl shadow-sm transition-all group cursor-pointer active:cursor-grabbing",
+                    theme === 'dark' ? "bg-slate-900 border-slate-800 hover:border-emerald-500/50" : "bg-white border-slate-200 hover:shadow-md hover:border-emerald-500",
+                    expandedDealId === deal.id && (theme === 'dark' ? "ring-2 ring-emerald-500/50 border-transparent" : "ring-2 ring-emerald-500 border-transparent")
                   )}
                 >
-                  <div className="text-sm font-semibold text-slate-900 mb-1">{deal.title}</div>
+                  <div className={cn("font-semibold mb-1", compact ? "text-xs" : "text-sm", theme === 'dark' ? "text-white" : "text-slate-900")}>{deal.title}</div>
                   <div className="text-xs text-slate-500 mb-2">{deal.contact_name}</div>
                   
                   <AnimatePresence>
@@ -997,7 +1265,7 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="pt-2 pb-3 space-y-2 border-t border-slate-100 mt-2">
+                        <div className={cn("pt-2 pb-3 space-y-2 border-t mt-2", theme === 'dark' ? "border-slate-800" : "border-slate-100")}>
                           <div className="flex items-center gap-2 text-[10px] text-slate-500">
                             <Mail className="w-3 h-3" /> {deal.contact_email}
                           </div>
@@ -1010,7 +1278,10 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
                   </AnimatePresence>
 
                   <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm font-bold text-emerald-600">{currencySymbol}{(deal.value || 0).toLocaleString(locale)}</div>
+                    <div className={cn(
+                      "text-sm font-bold",
+                      settings.primaryColor === 'emerald' ? "text-emerald-600" : settings.primaryColor === 'blue' ? "text-blue-600" : settings.primaryColor === 'violet' ? "text-violet-600" : "text-rose-600"
+                    )}>{currencySymbol}{(deal.value || 0).toLocaleString(locale)}</div>
                     <div className="flex items-center gap-2">
                       {differenceInDays(parseISO(deal.close_date), new Date()) <= 7 && differenceInDays(parseISO(deal.close_date), new Date()) >= 0 && (
                         <div className="p-1 bg-rose-50 text-rose-500 rounded-md" title="Approaching Close Date">
@@ -1027,7 +1298,13 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
                           e.stopPropagation();
                           moveDeal(deal.id, stages[stages.indexOf(stage) + 1]);
                         }}
-                        className="flex-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 py-1 rounded-md"
+                        className={cn(
+                          "flex-1 text-[10px] font-bold py-1 rounded-md transition-colors",
+                          settings.primaryColor === 'emerald' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" :
+                          settings.primaryColor === 'blue' ? "text-blue-600 bg-blue-50 hover:bg-blue-100" :
+                          settings.primaryColor === 'violet' ? "text-violet-600 bg-violet-50 hover:bg-violet-100" :
+                          "text-rose-600 bg-rose-50 hover:bg-rose-100"
+                        )}
                       >
                         Next Stage
                       </button>
@@ -1040,15 +1317,15 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Deal">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Deal" theme={theme}>
         <form onSubmit={handleAddDeal} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Deal Title</label>
-            <input required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
+            <input required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newDeal.title} onChange={e => setNewDeal({...newDeal, title: e.target.value})} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Contact</label>
-            <select required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newDeal.contact_id} onChange={e => setNewDeal({...newDeal, contact_id: Number(e.target.value)})}>
+            <select required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newDeal.contact_id} onChange={e => setNewDeal({...newDeal, contact_id: Number(e.target.value)})}>
               <option value="">Select a contact</option>
               {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -1056,14 +1333,17 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }:
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Value ({currencySymbol})</label>
-              <input type="number" required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newDeal.value} onChange={e => setNewDeal({...newDeal, value: Number(e.target.value)})} />
+              <input type="number" required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newDeal.value} onChange={e => setNewDeal({...newDeal, value: Number(e.target.value)})} />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Close Date</label>
-              <input type="date" required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newDeal.close_date} onChange={e => setNewDeal({...newDeal, close_date: e.target.value})} />
+              <input type="date" required className={cn("w-full px-4 py-2 border-none rounded-xl text-sm", theme === 'dark' ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900")} value={newDeal.close_date} onChange={e => setNewDeal({...newDeal, close_date: e.target.value})} />
             </div>
           </div>
-          <button type="submit" className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold mt-4">Create Deal</button>
+          <button type="submit" className={cn(
+            "w-full py-3 text-white rounded-xl font-semibold mt-4",
+            settings.primaryColor === 'emerald' ? "bg-emerald-600" : settings.primaryColor === 'blue' ? "bg-blue-600" : settings.primaryColor === 'violet' ? "bg-violet-600" : "bg-rose-600"
+          )}>Create Deal</button>
         </form>
       </Modal>
     </div>
@@ -1088,7 +1368,10 @@ export default function App() {
       email: 'rajesh@corecrm.in',
       currency: 'Indian Rupee (₹)',
       timezone: '(GMT+05:30) India Standard Time',
-      aiInsights: true
+      aiInsights: true,
+      theme: 'light',
+      compactMode: false,
+      primaryColor: 'emerald'
     };
   });
 
@@ -1132,38 +1415,94 @@ export default function App() {
       });
   }, []);
 
+  const colorClasses = {
+    emerald: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 text-emerald-600 text-emerald-700 bg-emerald-50 text-emerald-900 bg-emerald-100',
+    blue: 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 text-blue-600 text-blue-700 bg-blue-50 text-blue-900 bg-blue-100',
+    violet: 'bg-violet-600 hover:bg-violet-700 shadow-violet-200 text-violet-600 text-violet-700 bg-violet-50 text-violet-900 bg-violet-100',
+    rose: 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-rose-600 text-rose-700 bg-rose-50 text-rose-900 bg-rose-100'
+  };
+
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+    <div className={cn(
+      "flex h-screen font-sans transition-colors duration-300",
+      settings.theme === 'dark' ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900",
+      settings.compactMode && "text-xs"
+    )}>
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
-        <div className="p-6">
+      <aside className={cn(
+        "w-64 border-r flex flex-col transition-colors",
+        settings.theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+      )}>
+        <div className={cn(settings.compactMode ? "p-4" : "p-6")}>
           <div className="flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+            <div className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center",
+              settings.primaryColor === 'emerald' ? "bg-emerald-600" :
+              settings.primaryColor === 'blue' ? "bg-blue-600" :
+              settings.primaryColor === 'violet' ? "bg-violet-600" : "bg-rose-600"
+            )}>
               <span className="text-white font-bold text-xl">C</span>
             </div>
-            <span className="text-xl font-bold tracking-tight">Core</span>
+            <span className={cn("text-xl font-bold tracking-tight", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Core</span>
           </div>
 
           <nav className="space-y-1">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-            <SidebarItem icon={Users} label="Contacts" active={activeTab === 'contacts'} onClick={() => setActiveTab('contacts')} />
-            <SidebarItem icon={Briefcase} label="Pipeline" active={activeTab === 'pipeline'} onClick={() => setActiveTab('pipeline')} />
-            <SidebarItem icon={CheckSquare} label="Tasks" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
-            <SidebarItem icon={BarChart3} label="Analytics" active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} />
+            <SidebarItem 
+              icon={LayoutDashboard} 
+              label="Dashboard" 
+              active={activeTab === 'dashboard'} 
+              onClick={() => setActiveTab('dashboard')} 
+              primaryColor={settings.primaryColor}
+              theme={settings.theme}
+            />
+            <SidebarItem 
+              icon={Users} 
+              label="Contacts" 
+              active={activeTab === 'contacts'} 
+              onClick={() => setActiveTab('contacts')} 
+              primaryColor={settings.primaryColor}
+              theme={settings.theme}
+            />
+            <SidebarItem 
+              icon={Briefcase} 
+              label="Pipeline" 
+              active={activeTab === 'pipeline'} 
+              onClick={() => setActiveTab('pipeline')} 
+              primaryColor={settings.primaryColor}
+              theme={settings.theme}
+            />
+            <SidebarItem 
+              icon={CheckSquare} 
+              label="Tasks" 
+              active={activeTab === 'tasks'} 
+              onClick={() => setActiveTab('tasks')} 
+              primaryColor={settings.primaryColor}
+              theme={settings.theme}
+            />
+            <SidebarItem 
+              icon={BarChart3} 
+              label="Analytics" 
+              active={activeTab === 'analytics'} 
+              onClick={() => setActiveTab('analytics')} 
+              primaryColor={settings.primaryColor}
+              theme={settings.theme}
+            />
           </nav>
         </div>
 
-        <div className="mt-auto p-6 border-t border-slate-100">
+        <div className={cn("mt-auto border-t transition-colors", settings.theme === 'dark' ? "border-slate-800 p-4" : "border-slate-100 p-6")}>
           <SidebarItem 
             icon={Settings} 
             label="Settings" 
             active={activeTab === 'settings'} 
             onClick={() => setActiveTab('settings')} 
+            primaryColor={settings.primaryColor}
+            theme={settings.theme}
           />
           <div className="mt-6 flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-slate-200" />
+            <div className={cn("w-8 h-8 rounded-full", settings.theme === 'dark' ? "bg-slate-800" : "bg-slate-200")} />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-slate-900 truncate">Rajesh Kumar</div>
+              <div className={cn("text-sm font-medium truncate", settings.theme === 'dark' ? "text-slate-200" : "text-slate-900")}>Rajesh Kumar</div>
               <div className="text-xs text-slate-500 truncate">Admin</div>
             </div>
           </div>
@@ -1173,7 +1512,10 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
+        <header className={cn(
+          "h-16 border-b flex items-center justify-between px-8 transition-colors",
+          settings.theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+        )}>
           <div className="flex items-center gap-4 flex-1">
             <div className="relative w-96">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1182,7 +1524,10 @@ export default function App() {
                 placeholder="Search anything..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                className={cn(
+                  "w-full pl-10 pr-4 py-2 border-none rounded-xl text-sm transition-all",
+                  settings.theme === 'dark' ? "bg-slate-800 text-white focus:ring-emerald-500/40" : "bg-slate-50 text-slate-900 focus:ring-emerald-500/20"
+                )}
               />
             </div>
           </div>
@@ -1191,7 +1536,10 @@ export default function App() {
             <div className="relative">
               <button 
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg relative"
+                className={cn(
+                  "p-2 rounded-lg relative transition-colors",
+                  settings.theme === 'dark' ? "text-slate-400 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-50"
+                )}
               >
                 <Bell className="w-5 h-5" />
                 {notifications.length > 0 && (
@@ -1205,10 +1553,13 @@ export default function App() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-[110] overflow-hidden"
+                    className={cn(
+                      "absolute right-0 mt-2 w-80 border rounded-2xl shadow-xl z-[110] overflow-hidden",
+                      settings.theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                    )}
                   >
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-slate-900">Notifications</h4>
+                    <div className={cn("p-4 border-b flex items-center justify-between", settings.theme === 'dark' ? "border-slate-800" : "border-slate-100")}>
+                      <h4 className={cn("font-bold text-sm", settings.theme === 'dark' ? "text-white" : "text-slate-900")}>Notifications</h4>
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{notifications.length} New</span>
                     </div>
                     <div className="max-h-96 overflow-y-auto divide-y divide-slate-50">
@@ -1218,7 +1569,10 @@ export default function App() {
                         notifications.map(notif => (
                           <div 
                             key={notif.id} 
-                            className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                            className={cn(
+                              "p-4 cursor-pointer transition-colors",
+                              settings.theme === 'dark' ? "hover:bg-slate-800" : "hover:bg-slate-50"
+                            )}
                             onClick={() => {
                               if (notif.dealId) {
                                 setActiveTab('pipeline');
@@ -1232,7 +1586,7 @@ export default function App() {
                                 notif.type === 'urgent' ? "bg-rose-500" : "bg-amber-500"
                               )} />
                               <div className="space-y-1">
-                                <div className="text-sm font-semibold text-slate-900">{notif.title}</div>
+                                <div className={cn("text-sm font-semibold", settings.theme === 'dark' ? "text-slate-200" : "text-slate-900")}>{notif.title}</div>
                                 <div className="text-xs text-slate-500 leading-relaxed">{notif.message}</div>
                                 <div className="text-[10px] text-slate-400 font-medium">{notif.date}</div>
                               </div>
@@ -1247,7 +1601,13 @@ export default function App() {
             </div>
             <button 
               onClick={() => setIsQuickAddOpen(true)}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-emerald-200"
+              className={cn(
+                "flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm",
+                settings.primaryColor === 'emerald' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200" :
+                settings.primaryColor === 'blue' ? "bg-blue-600 hover:bg-blue-700 shadow-blue-200" :
+                settings.primaryColor === 'violet' ? "bg-violet-600 hover:bg-violet-700 shadow-violet-200" :
+                "bg-rose-600 hover:bg-rose-700 shadow-rose-200"
+              )}
             >
               <Plus className="w-4 h-4" /> New Action
             </button>
@@ -1255,7 +1615,7 @@ export default function App() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className={cn("flex-1 overflow-y-auto", settings.compactMode ? "p-4" : "p-8")}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -1268,7 +1628,7 @@ export default function App() {
               {activeTab === 'dashboard' && <DashboardView stats={stats} settings={settings} />}
               {activeTab === 'contacts' && <ContactsView searchQuery={searchQuery} openModalOnMount={pendingModal === 'contact'} onModalClose={() => setPendingModal(null)} settings={settings} />}
               {activeTab === 'pipeline' && <PipelineView searchQuery={searchQuery} openModalOnMount={pendingModal === 'deal'} onModalClose={() => setPendingModal(null)} settings={settings} />}
-              {activeTab === 'tasks' && <TaskView openModalOnMount={pendingModal === 'task'} onModalClose={() => setPendingModal(null)} />}
+              {activeTab === 'tasks' && <TaskView openModalOnMount={pendingModal === 'task'} onModalClose={() => setPendingModal(null)} settings={settings} />}
               {activeTab === 'analytics' && <AnalyticsView settings={settings} />}
               {activeTab === 'settings' && <SettingsView settings={settings} onSave={setSettings} />}
             </motion.div>

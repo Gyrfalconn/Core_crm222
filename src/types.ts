@@ -49,4 +49,7 @@ export interface UserSettings {
   currency: 'Indian Rupee (₹)' | 'US Dollar ($)';
   timezone: string;
   aiInsights: boolean;
+  theme: 'light' | 'dark' | 'system';
+  compactMode: boolean;
+  primaryColor: 'emerald' | 'blue' | 'violet' | 'rose';
 }
