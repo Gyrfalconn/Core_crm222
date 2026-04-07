@@ -68,7 +68,7 @@ async function startServer() {
 
   app.get("/api/deals", (req, res) => {
     const deals = db.prepare(`
-      SELECT deals.*, contacts.name as contact_name 
+      SELECT deals.*, contacts.name as contact_name, contacts.email as contact_email
       FROM deals 
       LEFT JOIN contacts ON deals.contact_id = contacts.id
     `).all();

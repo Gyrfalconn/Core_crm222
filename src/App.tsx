@@ -17,7 +17,10 @@ import {
   Sparkles,
   ChevronRight,
   Mail,
-  Phone
+  Phone,
+  Download,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,11 +33,16 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Cell
+  Cell,
+  PieChart,
+  Pie,
+  Legend
 } from 'recharts';
 import { cn } from './lib/utils';
-import { Contact, Deal, Task, Stats } from './types';
+import { Contact, Deal, Task, Stats, Notification, UserSettings } from './types';
 import { getLeadInsights } from './services/gemini';
+import { exportToExcel, exportToPDF } from './lib/export';
+import { format, differenceInDays, parseISO } from 'date-fns';
 
 // --- Components ---
 
@@ -73,16 +81,20 @@ const StatCard = ({ label, value, icon: Icon, trend, color }: { label: string, v
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => (
   <AnimatePresence>
     {isOpen && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+      <div 
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">{title}</h3>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
               <Plus className="w-5 h-5 rotate-45" />
             </button>
           </div>
@@ -131,10 +143,48 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
     fetchTasks();
   };
 
+  const handleExportExcel = () => {
+    const exportData = tasks.map(t => ({
+      Title: t.title,
+      'Due Date': t.due_date,
+      Priority: t.priority,
+      Status: t.status
+    }));
+    exportToExcel(exportData, 'Tasks_Export');
+  };
+
+  const handleExportPDF = () => {
+    const exportData = tasks.map(t => ({
+      title: t.title,
+      due: t.due_date,
+      priority: t.priority,
+      status: t.status
+    }));
+    exportToPDF(exportData, ['title', 'due', 'priority', 'status'], 'Tasks_Export', 'Core CRM - Task List');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-slate-900">Tasks</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-slate-900">Tasks</h3>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={handleExportExcel}
+              className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleExportPDF}
+              className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
+              title="Export to PDF"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
         <button 
           onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold"
@@ -157,7 +207,13 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
                 {task.status === 'Completed' && <CheckSquare className="w-4 h-4" />}
               </button>
               <div className="flex-1">
-                <div className={cn("text-sm font-medium", task.status === 'Completed' ? "text-slate-400 line-through" : "text-slate-900")}>
+                <div className={cn("text-sm font-medium flex items-center gap-2", task.status === 'Completed' ? "text-slate-400 line-through" : "text-slate-900")}>
+                  <div className={cn(
+                    "w-2 h-2 rounded-full shrink-0",
+                    task.priority === 'High' ? "bg-rose-500" :
+                    task.priority === 'Medium' ? "bg-amber-500" :
+                    "bg-emerald-500"
+                  )} />
                   {task.title}
                 </div>
                 <div className="text-xs text-slate-500">Due: {task.due_date}</div>
@@ -166,7 +222,7 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
                 "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
                 task.priority === 'High' ? "bg-rose-100 text-rose-700" :
                 task.priority === 'Medium' ? "bg-amber-100 text-amber-700" :
-                "bg-slate-100 text-slate-700"
+                "bg-emerald-100 text-emerald-700"
               )}>
                 {task.priority}
               </span>
@@ -217,13 +273,35 @@ const TaskView = ({ openModalOnMount, onModalClose }: { openModalOnMount?: boole
   );
 };
 
-const AnalyticsView = () => {
+const AnalyticsView = ({ settings }: { settings: UserSettings }) => {
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
+  const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
+
+  useEffect(() => {
+    fetch('/api/deals')
+      .then(res => res.json())
+      .then(data => {
+        setDeals(data);
+        setLoading(false);
+      });
+  }, []);
+
   const data = [
     { name: 'Week 1', won: 4000, lost: 2400 },
     { name: 'Week 2', won: 3000, lost: 1398 },
     { name: 'Week 3', won: 2000, lost: 9800 },
     { name: 'Week 4', won: 2780, lost: 3908 },
   ];
+
+  const stages = ['Discovery', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won'];
+  const stageValueData = stages.map(stage => ({
+    name: stage,
+    value: deals.filter(d => d.stage === stage).reduce((sum, d) => sum + (d.value || 0), 0)
+  })).filter(item => item.value > 0);
+
+  const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
   return (
     <div className="space-y-8">
@@ -244,20 +322,53 @@ const AnalyticsView = () => {
             </ResponsiveContainer>
           </div>
         </div>
+
         <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
-          <h4 className="text-sm font-bold text-slate-500 uppercase mb-6">Stage Distribution</h4>
-          <div className="space-y-4">
-            {['Discovery', 'Proposal', 'Negotiation'].map(stage => (
-              <div key={stage} className="space-y-1">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-slate-600">{stage}</span>
-                  <span className="text-slate-900">45%</span>
+          <h4 className="text-sm font-bold text-slate-500 uppercase mb-6">Pipeline Value by Stage</h4>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stageValueData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {stageValueData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value: number) => `${currencySymbol}${value.toLocaleString(locale)}`}
+                />
+                <Legend verticalAlign="bottom" height={36}/>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm lg:col-span-2">
+          <h4 className="text-sm font-bold text-slate-500 uppercase mb-6">Stage Distribution (Count)</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {stages.slice(0, 4).map(stage => {
+              const count = deals.filter(d => d.stage === stage).length;
+              const total = deals.length || 1;
+              const percentage = Math.round((count / total) * 100);
+              return (
+                <div key={stage} className="space-y-1">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span className="text-slate-600">{stage}</span>
+                    <span className="text-slate-900">{percentage}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${percentage}%` }} />
+                  </div>
                 </div>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: '45%' }} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -265,9 +376,44 @@ const AnalyticsView = () => {
   );
 };
 
-const SettingsView = () => {
+const SettingsView = ({ settings, onSave }: { settings: UserSettings, onSave: (newSettings: UserSettings) => void }) => {
+  const [localSettings, setLocalSettings] = useState<UserSettings>(settings);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
+  const handleSave = () => {
+    setIsSaving(true);
+    // Simulate API call
+    setTimeout(() => {
+      onSave(localSettings);
+      setIsSaving(false);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    }, 800);
+  };
+
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8 max-w-4xl relative">
+      <AnimatePresence>
+        {showSuccess && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-24 right-8 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl z-[120] flex items-center gap-3"
+          >
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <CheckSquare className="w-4 h-4" />
+            </div>
+            <span className="font-semibold text-sm">Settings saved successfully!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <h3 className="text-xl font-bold text-slate-900">Settings</h3>
       
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100">
@@ -276,11 +422,19 @@ const SettingsView = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase">Full Name</label>
-              <input className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" defaultValue="Rajesh Kumar" />
+              <input 
+                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                value={localSettings.fullName}
+                onChange={e => setLocalSettings({...localSettings, fullName: e.target.value})}
+              />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase">Email Address</label>
-              <input className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" defaultValue="rajesh@corecrm.in" />
+              <input 
+                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                value={localSettings.email}
+                onChange={e => setLocalSettings({...localSettings, email: e.target.value})}
+              />
             </div>
           </div>
         </div>
@@ -290,14 +444,22 @@ const SettingsView = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase">Currency</label>
-              <select className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm">
+              <select 
+                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                value={localSettings.currency}
+                onChange={e => setLocalSettings({...localSettings, currency: e.target.value as any})}
+              >
                 <option>Indian Rupee (₹)</option>
                 <option>US Dollar ($)</option>
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase">Timezone</label>
-              <select className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm">
+              <select 
+                className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                value={localSettings.timezone}
+                onChange={e => setLocalSettings({...localSettings, timezone: e.target.value})}
+              >
                 <option>(GMT+05:30) India Standard Time</option>
                 <option>(GMT-08:00) Pacific Time</option>
               </select>
@@ -310,21 +472,52 @@ const SettingsView = () => {
             <h4 className="text-sm font-bold text-slate-900">AI Insights</h4>
             <p className="text-xs text-slate-500">Enable Gemini-powered lead analysis</p>
           </div>
-          <div className="w-12 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
-            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
-          </div>
+          <button 
+            onClick={() => setLocalSettings({...localSettings, aiInsights: !localSettings.aiInsights})}
+            className={cn(
+              "w-12 h-6 rounded-full relative transition-all duration-200",
+              localSettings.aiInsights ? "bg-emerald-500" : "bg-slate-200"
+            )}
+          >
+            <motion.div 
+              animate={{ x: localSettings.aiInsights ? 24 : 4 }}
+              className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+            />
+          </button>
         </div>
       </div>
 
       <div className="flex justify-end gap-3">
-        <button className="px-6 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all">Cancel</button>
-        <button className="px-6 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all">Save Changes</button>
+        <button 
+          className="px-6 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+          onClick={() => setLocalSettings(settings)}
+        >
+          Cancel
+        </button>
+        <button 
+          disabled={isSaving}
+          onClick={handleSave}
+          className={cn(
+            "px-6 py-2 rounded-xl text-sm font-semibold text-white shadow-sm transition-all flex items-center gap-2",
+            isSaving ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+          )}
+        >
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving...
+            </>
+          ) : 'Save Changes'}
+        </button>
       </div>
     </div>
   );
 };
 
-const DashboardView = ({ stats }: { stats: Stats | null }) => {
+const DashboardView = ({ stats, settings }: { stats: Stats | null, settings: UserSettings }) => {
+  const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
+  const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
+
   const data = [
     { name: 'Jan', value: 4000 },
     { name: 'Feb', value: 3000 },
@@ -339,7 +532,7 @@ const DashboardView = ({ stats }: { stats: Stats | null }) => {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           label="Pipeline Value" 
-          value={`₹${stats?.pipelineValue.toLocaleString('en-IN')}`} 
+          value={`${currencySymbol}${(stats?.pipelineValue || 0).toLocaleString(locale)}`} 
           icon={DollarSign} 
           trend="+12.5%" 
           color="bg-emerald-500"
@@ -422,13 +615,16 @@ const DashboardView = ({ stats }: { stats: Stats | null }) => {
   );
 };
 
-const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQuery: string, openModalOnMount?: boolean, onModalClose?: () => void }) => {
+const ContactsView = ({ searchQuery, openModalOnMount, onModalClose, settings }: { searchQuery: string, openModalOnMount?: boolean, onModalClose?: () => void, settings: UserSettings }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [insight, setInsight] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', email: '', company: '', status: 'Lead', value: 0 });
+
+  const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
+  const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
 
   useEffect(() => {
     if (openModalOnMount) {
@@ -444,10 +640,10 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
 
   useEffect(() => { fetchContacts(); }, []);
 
-  const filteredContacts = contacts.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredContacts = (contacts || []).filter(c => 
+    (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (c.company || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.email || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleAddContact = async (e: React.FormEvent) => {
@@ -468,11 +664,51 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
     setInsight(aiInsight || "No insights available.");
   };
 
+  const handleExportExcel = () => {
+    const exportData = filteredContacts.map(c => ({
+      Name: c.name,
+      Email: c.email,
+      Company: c.company,
+      Status: c.status,
+      Value: `${currencySymbol}${c.value.toLocaleString(locale)}`
+    }));
+    exportToExcel(exportData, 'Contacts_Export');
+  };
+
+  const handleExportPDF = () => {
+    const exportData = filteredContacts.map(c => ({
+      name: c.name,
+      email: c.email,
+      company: c.company,
+      status: c.status,
+      value: `${currencySymbol}${c.value.toLocaleString(locale)}`
+    }));
+    exportToPDF(exportData, ['name', 'email', 'company', 'status', 'value'], 'Contacts_Export', 'Core CRM - Contacts List');
+  };
+
   return (
     <div className="flex gap-6 h-full">
       <div className={cn("bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex-1 transition-all", selectedContact ? "w-2/3" : "w-full")}>
-        <div className="p-4 border-bottom border-slate-100 flex items-center justify-between">
-          <h3 className="font-semibold text-slate-900">Contacts</h3>
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h3 className="font-semibold text-slate-900">Contacts</h3>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={handleExportExcel}
+                className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors"
+                title="Export to Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={handleExportPDF}
+                className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
+                title="Export to PDF"
+              >
+                <FileText className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
           <button 
             onClick={() => setIsModalOpen(true)}
             className="p-2 hover:bg-slate-50 rounded-lg text-emerald-600"
@@ -520,7 +756,7 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
                       {contact.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">₹{contact.value.toLocaleString('en-IN')}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{currencySymbol}{(contact.value || 0).toLocaleString(locale)}</td>
                   <td className="px-6 py-4 text-right">
                     <button className="p-1 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
                       <MoreVertical className="w-4 h-4" />
@@ -557,7 +793,7 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Value (₹)</label>
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Value ({currencySymbol})</label>
               <input type="number" className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newContact.value} onChange={e => setNewContact({...newContact, value: Number(e.target.value)})} />
             </div>
           </div>
@@ -627,10 +863,11 @@ const ContactsView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
   );
 };
 
-const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQuery: string, openModalOnMount?: boolean, onModalClose?: () => void }) => {
+const PipelineView = ({ searchQuery, openModalOnMount, onModalClose, settings }: { searchQuery: string, openModalOnMount?: boolean, onModalClose?: () => void, settings: UserSettings }) => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedDealId, setExpandedDealId] = useState<number | null>(null);
   const [newDeal, setNewDeal] = useState({ title: '', contact_id: 0, stage: 'Discovery', value: 0, close_date: '' });
   const stages = ['Discovery', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won'];
 
@@ -641,6 +878,9 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
     }
   }, [openModalOnMount]);
 
+  const currencySymbol = settings.currency === 'Indian Rupee (₹)' ? '₹' : '$';
+  const locale = settings.currency === 'Indian Rupee (₹)' ? 'en-IN' : 'en-US';
+
   const fetchData = () => {
     fetch('/api/deals').then(res => res.json()).then(setDeals);
     fetch('/api/contacts').then(res => res.json()).then(setContacts);
@@ -648,9 +888,9 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
 
   useEffect(() => { fetchData(); }, []);
 
-  const filteredDeals = deals.filter(d => 
-    d.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    d.contact_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredDeals = (deals || []).filter(d => 
+    (d.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (d.contact_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleAddDeal = async (e: React.FormEvent) => {
@@ -673,10 +913,50 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
     fetchData();
   };
 
+  const handleExportExcel = () => {
+    const exportData = filteredDeals.map(d => ({
+      Title: d.title,
+      Contact: d.contact_name,
+      Stage: d.stage,
+      Value: `${currencySymbol}${d.value.toLocaleString(locale)}`,
+      'Close Date': d.close_date
+    }));
+    exportToExcel(exportData, 'Pipeline_Export');
+  };
+
+  const handleExportPDF = () => {
+    const exportData = filteredDeals.map(d => ({
+      title: d.title,
+      contact: d.contact_name,
+      stage: d.stage,
+      value: `${currencySymbol}${d.value.toLocaleString(locale)}`,
+      date: d.close_date
+    }));
+    exportToPDF(exportData, ['title', 'contact', 'stage', 'value', 'date'], 'Pipeline_Export', 'Core CRM - Sales Pipeline');
+  };
+
   return (
     <div className="h-full flex flex-col space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-slate-900">Pipeline</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-slate-900">Pipeline</h3>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={handleExportExcel}
+              className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleExportPDF}
+              className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
+              title="Export to PDF"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
         <button 
           onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold"
@@ -697,20 +977,56 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
             <div className="flex-1 space-y-3 overflow-y-auto">
               {filteredDeals.filter(d => d.stage === stage).map(deal => (
                 <motion.div 
+                  layout
                   layoutId={`deal-${deal.id}`}
                   key={deal.id} 
-                  className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all group"
+                  onClick={() => setExpandedDealId(expandedDealId === deal.id ? null : deal.id)}
+                  className={cn(
+                    "p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all group cursor-pointer",
+                    expandedDealId === deal.id && "ring-2 ring-emerald-500 border-transparent"
+                  )}
                 >
                   <div className="text-sm font-semibold text-slate-900 mb-1">{deal.title}</div>
-                  <div className="text-xs text-slate-500 mb-3">{deal.contact_name}</div>
+                  <div className="text-xs text-slate-500 mb-2">{deal.contact_name}</div>
+                  
+                  <AnimatePresence>
+                    {expandedDealId === deal.id && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-2 pb-3 space-y-2 border-t border-slate-100 mt-2">
+                          <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                            <Mail className="w-3 h-3" /> {deal.contact_email}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                            <CheckSquare className="w-3 h-3" /> Close Date: {deal.close_date}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm font-bold text-emerald-600">₹{deal.value.toLocaleString('en-IN')}</div>
-                    <div className="text-[10px] text-slate-400 font-medium">{deal.close_date}</div>
+                    <div className="text-sm font-bold text-emerald-600">{currencySymbol}{(deal.value || 0).toLocaleString(locale)}</div>
+                    <div className="flex items-center gap-2">
+                      {differenceInDays(parseISO(deal.close_date), new Date()) <= 7 && differenceInDays(parseISO(deal.close_date), new Date()) >= 0 && (
+                        <div className="p-1 bg-rose-50 text-rose-500 rounded-md" title="Approaching Close Date">
+                          <Bell className="w-3 h-3 animate-pulse" />
+                        </div>
+                      )}
+                      {expandedDealId !== deal.id && <div className="text-[10px] text-slate-400 font-medium">{deal.close_date}</div>}
+                    </div>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     {stages.indexOf(stage) < stages.length - 1 && (
                       <button 
-                        onClick={() => moveDeal(deal.id, stages[stages.indexOf(stage) + 1])}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveDeal(deal.id, stages[stages.indexOf(stage) + 1]);
+                        }}
                         className="flex-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 py-1 rounded-md"
                       >
                         Next Stage
@@ -739,7 +1055,7 @@ const PipelineView = ({ searchQuery, openModalOnMount, onModalClose }: { searchQ
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Value (₹)</label>
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Value ({currencySymbol})</label>
               <input type="number" required className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm" value={newDeal.value} onChange={e => setNewDeal({...newDeal, value: Number(e.target.value)})} />
             </div>
             <div>
@@ -762,11 +1078,58 @@ export default function App() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingModal, setPendingModal] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  
+  const [settings, setSettings] = useState<UserSettings>(() => {
+    const saved = localStorage.getItem('core_crm_settings');
+    return saved ? JSON.parse(saved) : {
+      fullName: 'Rajesh Kumar',
+      email: 'rajesh@corecrm.in',
+      currency: 'Indian Rupee (₹)',
+      timezone: '(GMT+05:30) India Standard Time',
+      aiInsights: true
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('core_crm_settings', JSON.stringify(settings));
+  }, [settings]);
 
   useEffect(() => {
     fetch('/api/stats')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch stats');
+        return res.json();
+      })
+      .then(setStats)
+      .catch(err => console.error('Error fetching stats:', err));
+
+    // Generate notifications from deals
+    fetch('/api/deals')
       .then(res => res.json())
-      .then(setStats);
+      .then((deals: Deal[]) => {
+        const notifs: Notification[] = [];
+        const today = new Date();
+        
+        deals.forEach(deal => {
+          const closeDate = parseISO(deal.close_date);
+          const daysLeft = differenceInDays(closeDate, today);
+          
+          if (daysLeft >= 0 && daysLeft <= 7) {
+            notifs.push({
+              id: `deal-${deal.id}`,
+              title: 'Approaching Close Date',
+              message: `Deal "${deal.title}" is closing in ${daysLeft} days.`,
+              type: daysLeft <= 3 ? 'urgent' : 'warning',
+              date: deal.close_date,
+              dealId: deal.id
+            });
+          }
+        });
+        
+        setNotifications(notifs);
+      });
   }, []);
 
   return (
@@ -825,10 +1188,63 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg relative"
+              >
+                <Bell className="w-5 h-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {isNotifOpen && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-[110] overflow-hidden"
+                  >
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-slate-900">Notifications</h4>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{notifications.length} New</span>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto divide-y divide-slate-50">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-sm">No new notifications</div>
+                      ) : (
+                        notifications.map(notif => (
+                          <div 
+                            key={notif.id} 
+                            className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                            onClick={() => {
+                              if (notif.dealId) {
+                                setActiveTab('pipeline');
+                                setIsNotifOpen(false);
+                              }
+                            }}
+                          >
+                            <div className="flex gap-3">
+                              <div className={cn(
+                                "w-2 h-2 rounded-full mt-1.5 shrink-0",
+                                notif.type === 'urgent' ? "bg-rose-500" : "bg-amber-500"
+                              )} />
+                              <div className="space-y-1">
+                                <div className="text-sm font-semibold text-slate-900">{notif.title}</div>
+                                <div className="text-xs text-slate-500 leading-relaxed">{notif.message}</div>
+                                <div className="text-[10px] text-slate-400 font-medium">{notif.date}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <button 
               onClick={() => setIsQuickAddOpen(true)}
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-emerald-200"
@@ -849,12 +1265,12 @@ export default function App() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              {activeTab === 'dashboard' && <DashboardView stats={stats} />}
-              {activeTab === 'contacts' && <ContactsView searchQuery={searchQuery} openModalOnMount={pendingModal === 'contact'} onModalClose={() => setPendingModal(null)} />}
-              {activeTab === 'pipeline' && <PipelineView searchQuery={searchQuery} openModalOnMount={pendingModal === 'deal'} onModalClose={() => setPendingModal(null)} />}
+              {activeTab === 'dashboard' && <DashboardView stats={stats} settings={settings} />}
+              {activeTab === 'contacts' && <ContactsView searchQuery={searchQuery} openModalOnMount={pendingModal === 'contact'} onModalClose={() => setPendingModal(null)} settings={settings} />}
+              {activeTab === 'pipeline' && <PipelineView searchQuery={searchQuery} openModalOnMount={pendingModal === 'deal'} onModalClose={() => setPendingModal(null)} settings={settings} />}
               {activeTab === 'tasks' && <TaskView openModalOnMount={pendingModal === 'task'} onModalClose={() => setPendingModal(null)} />}
-              {activeTab === 'analytics' && <AnalyticsView />}
-              {activeTab === 'settings' && <SettingsView />}
+              {activeTab === 'analytics' && <AnalyticsView settings={settings} />}
+              {activeTab === 'settings' && <SettingsView settings={settings} onSave={setSettings} />}
             </motion.div>
           </AnimatePresence>
         </div>

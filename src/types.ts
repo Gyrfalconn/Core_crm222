@@ -13,6 +13,7 @@ export interface Deal {
   title: string;
   contact_id: number;
   contact_name?: string;
+  contact_email?: string;
   stage: 'Discovery' | 'Qualification' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
   value: number;
   close_date: string;
@@ -31,4 +32,21 @@ export interface Stats {
   activeDeals: number;
   newLeads: number;
   winRate: number;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'urgent';
+  date: string;
+  dealId?: number;
+}
+
+export interface UserSettings {
+  fullName: string;
+  email: string;
+  currency: 'Indian Rupee (₹)' | 'US Dollar ($)';
+  timezone: string;
+  aiInsights: boolean;
 }
